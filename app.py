@@ -1,8 +1,14 @@
-
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import sqlite3
 
 app = Flask(__name__)
+
+# ==================== LOGIN SETTINGS ====================
+
+app.secret_key = "placement-tracker-secret-key"
+
+LOGIN_USERNAME = "deepak"
+LOGIN_PASSWORD = "123456"
 
 DATABASE = "placement.db"
 
@@ -69,10 +75,54 @@ def read_json():
     return request.get_json(silent=True) or {}
 
 
+# ==================== LOGIN ====================
+
+@app.route("/login", methods=["GET"])
+def login_page():
+
+    if "user_id" in session:
+        return redirect(url_for("home"))
+
+    return render_template("login.html")
+
+
+@app.route("/login", methods=["POST"])
+def login():
+
+    data = read_json()
+
+    username = data.get("username", "")
+    password = data.get("password", "")
+
+    if username == LOGIN_USERNAME and password == LOGIN_PASSWORD:
+
+        session["user_id"] = username
+
+        return jsonify({
+            "message": "Login successful"
+        })
+
+    return jsonify({
+        "error": "Invalid User ID or Password"
+    }), 401
+
+
+@app.route("/logout")
+def logout():
+
+    session.clear()
+
+    return redirect(url_for("login_page"))
+
+
 # ==================== HOME ====================
 
 @app.route("/")
 def home():
+
+    if "user_id" not in session:
+        return redirect(url_for("login_page"))
+
     return render_template("index.html")
 
 
@@ -149,7 +199,6 @@ def update_skill(skill_id):
     conn = get_connection()
     cursor = conn.cursor()
 
-    # DELETE SKILL
     if request.method == "DELETE":
 
         cursor.execute(
@@ -172,7 +221,6 @@ def update_skill(skill_id):
             "message": "Skill deleted successfully!"
         })
 
-    # UPDATE SKILL
     data = read_json()
 
     try:
@@ -284,7 +332,6 @@ def update_project(project_id):
     conn = get_connection()
     cursor = conn.cursor()
 
-    # DELETE PROJECT
     if request.method == "DELETE":
 
         cursor.execute(
@@ -307,7 +354,6 @@ def update_project(project_id):
             "message": "Project deleted successfully!"
         })
 
-    # UPDATE PROJECT
     data = read_json()
 
     name = data.get("name", "")
@@ -434,7 +480,6 @@ def update_company(company_id):
     conn = get_connection()
     cursor = conn.cursor()
 
-    # DELETE COMPANY
     if request.method == "DELETE":
 
         cursor.execute(
@@ -457,7 +502,6 @@ def update_company(company_id):
             "message": "Company deleted successfully!"
         })
 
-    # UPDATE COMPANY
     data = read_json()
 
     status = data.get("status", "")
@@ -567,7 +611,6 @@ def update_dsa(topic_id):
     conn = get_connection()
     cursor = conn.cursor()
 
-    # DELETE DSA TOPIC
     if request.method == "DELETE":
 
         cursor.execute(
@@ -590,7 +633,6 @@ def update_dsa(topic_id):
             "message": "DSA topic deleted successfully!"
         })
 
-    # UPDATE DSA
     data = read_json()
 
     try:
@@ -735,7 +777,6 @@ def update_interview(interview_id):
     conn = get_connection()
     cursor = conn.cursor()
 
-    # DELETE INTERVIEW
     if request.method == "DELETE":
 
         cursor.execute(
@@ -758,7 +799,6 @@ def update_interview(interview_id):
             "message": "Interview deleted successfully!"
         })
 
-    # UPDATE INTERVIEW
     data = read_json()
 
     status = data.get("status", "")
@@ -816,4 +856,3 @@ if __name__ == "__main__":
         port=5000,
         debug=True
     )
-
