@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Student Placement Tracker</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div class="container">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <h2>Placement<br>Tracker</h2>
+
+            <nav>
+                <a href="#" class="active" data-page="dashboard">Dashboard</a>
+<a href="#" data-page="skills">Skills</a>
+<a href="#" data-page="dsa">DSA</a>
+<a href="#" data-page="companies">Companies</a>
+<a href="#" data-page="interviews">Interviews</a>
+<a href="#" data-page="projects">Projects</a>
+            </nav>
+        </aside>
+
+
+        <!-- Main Content -->
+        <main class="main">
+
+            <header>
+                <h1>Welcome, Student 👋</h1>
+                <p>Track your placement preparation</p>
+            </header>
+
+
+            <!-- Statistics -->
+            <section class="cards">
+
+                <div class="card">
+                    <h3>Skills</h3>
+                    <p class="number">65%</p>
+                    <span>Overall progress</span>
+                </div>
+
+                <div class="card">
+                    <h3>DSA</h3>
+                    <p class="number">40%</p>
+                    <span>Problems completed</span>
+                </div>
+
+                <div class="card">
+                    <h3>Projects</h3>
+                    <p class="number">3</p>
+                    <span>Projects completed</span>
+                </div>
+
+                <div class="card">
+                    <h3>Applications</h3>
+                    <p class="number">5</p>
+                    <span>Companies applied</span>
+                </div>
+
+            </section>
+
+
+            <!-- Progress -->
+            <section class="progress-section">
+
+                <h2>Skill Progress</h2>
+
+                <div class="skill">
+                    <div class="skill-info">
+                        <span>HTML & CSS</span>
+                        <span>90%</span>
+                    </div>
+
+                    <div class="progress-bar">
+                        <div class="progress html"></div>
+                    </div>
+                </div>
+
+
+                <div class="skill">
+                    <div class="skill-info">
+                        <span>C++</span>
+                        <span>70%</span>
+                    </div>
+
+                    <div class="progress-bar">
+                        <div class="progress cpp"></div>
+                    </div>
+                </div>
+
+
+                <div class="skill">
+                    <div class="skill-info">
+                        <span>Python</span>
+                        <span>60%</span>
+                    </div>
+
+                    <div class="progress-bar">
+                        <div class="progress python"></div>
+                    </div>
+                </div>
+
+
+                <div class="skill">
+                    <div class="skill-info">
+                        <span>DSA</span>
+                        <span>40%</span>
+                    </div>
+
+                    <div class="progress-bar">
+                        <div class="progress dsa"></div>
+                    </div>
+                </div>
+
+            </section>
+
+        </main>
+
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>
+

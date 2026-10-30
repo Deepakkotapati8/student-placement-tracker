@@ -1,0 +1,819 @@
+
+from flask import Flask, request, jsonify, render_template
+import sqlite3
+
+app = Flask(__name__)
+
+DATABASE = "placement.db"
+
+
+# ==================== DATABASE ====================
+
+def init_db():
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS skills (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            progress INTEGER NOT NULL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS companies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            status TEXT DEFAULT 'Not Applied'
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS dsa (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            topic TEXT NOT NULL,
+            total_problems INTEGER DEFAULT 0,
+            solved_problems INTEGER DEFAULT 0
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS interviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company TEXT NOT NULL,
+            role TEXT,
+            interview_date TEXT,
+            status TEXT DEFAULT 'Scheduled',
+            notes TEXT
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def get_connection():
+    return sqlite3.connect(DATABASE)
+
+
+def read_json():
+    return request.get_json(silent=True) or {}
+
+
+# ==================== HOME ====================
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+
+# ==================== SKILLS ====================
+
+@app.route("/api/skills", methods=["GET"])
+def get_skills():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM skills ORDER BY id DESC")
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return jsonify([
+        {
+            "id": row[0],
+            "name": row[1],
+            "progress": row[2]
+        }
+        for row in rows
+    ])
+
+
+@app.route("/api/skills", methods=["POST"])
+def add_skill():
+
+    data = read_json()
+
+    name = data.get("name", "")
+    progress = data.get("progress", 0)
+
+    if not isinstance(name, str) or not name.strip():
+        return jsonify({
+            "error": "Skill name is required"
+        }), 400
+
+    try:
+        progress = int(progress)
+    except (TypeError, ValueError):
+        return jsonify({
+            "error": "Progress must be a whole number"
+        }), 400
+
+    if not 0 <= progress <= 100:
+        return jsonify({
+            "error": "Progress must be between 0 and 100"
+        }), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO skills (name, progress)
+        VALUES (?, ?)
+        """,
+        (name.strip(), progress)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "message": "Skill added successfully!"
+    }), 201
+
+
+@app.route("/api/skills/<int:skill_id>", methods=["PUT", "DELETE"])
+def update_skill(skill_id):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # DELETE SKILL
+    if request.method == "DELETE":
+
+        cursor.execute(
+            "DELETE FROM skills WHERE id = ?",
+            (skill_id,)
+        )
+
+        conn.commit()
+
+        deleted = cursor.rowcount
+
+        conn.close()
+
+        if deleted == 0:
+            return jsonify({
+                "error": "Skill not found"
+            }), 404
+
+        return jsonify({
+            "message": "Skill deleted successfully!"
+        })
+
+    # UPDATE SKILL
+    data = read_json()
+
+    try:
+        progress = int(data.get("progress"))
+    except (TypeError, ValueError):
+
+        conn.close()
+
+        return jsonify({
+            "error": "Progress must be a whole number"
+        }), 400
+
+    if not 0 <= progress <= 100:
+
+        conn.close()
+
+        return jsonify({
+            "error": "Progress must be between 0 and 100"
+        }), 400
+
+    cursor.execute(
+        """
+        UPDATE skills
+        SET progress = ?
+        WHERE id = ?
+        """,
+        (progress, skill_id)
+    )
+
+    conn.commit()
+
+    updated = cursor.rowcount
+
+    conn.close()
+
+    if updated == 0:
+        return jsonify({
+            "error": "Skill not found"
+        }), 404
+
+    return jsonify({
+        "message": "Skill progress updated successfully!"
+    })
+
+
+# ==================== PROJECTS ====================
+
+@app.route("/api/projects", methods=["GET"])
+def get_projects():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM projects ORDER BY id DESC")
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return jsonify([
+        {
+            "id": row[0],
+            "name": row[1],
+            "description": row[2] or ""
+        }
+        for row in rows
+    ])
+
+
+@app.route("/api/projects", methods=["POST"])
+def add_project():
+
+    data = read_json()
+
+    name = data.get("name", "")
+    description = data.get("description", "")
+
+    if not isinstance(name, str) or not name.strip():
+        return jsonify({
+            "error": "Project name is required"
+        }), 400
+
+    if not isinstance(description, str):
+        return jsonify({
+            "error": "Description must be text"
+        }), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO projects (name, description)
+        VALUES (?, ?)
+        """,
+        (name.strip(), description.strip())
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "message": "Project added successfully!"
+    }), 201
+
+
+@app.route("/api/projects/<int:project_id>", methods=["PUT", "DELETE"])
+def update_project(project_id):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # DELETE PROJECT
+    if request.method == "DELETE":
+
+        cursor.execute(
+            "DELETE FROM projects WHERE id = ?",
+            (project_id,)
+        )
+
+        conn.commit()
+
+        deleted = cursor.rowcount
+
+        conn.close()
+
+        if deleted == 0:
+            return jsonify({
+                "error": "Project not found"
+            }), 404
+
+        return jsonify({
+            "message": "Project deleted successfully!"
+        })
+
+    # UPDATE PROJECT
+    data = read_json()
+
+    name = data.get("name", "")
+    description = data.get("description", "")
+
+    if not isinstance(name, str) or not name.strip():
+
+        conn.close()
+
+        return jsonify({
+            "error": "Project name is required"
+        }), 400
+
+    if not isinstance(description, str):
+
+        conn.close()
+
+        return jsonify({
+            "error": "Description must be text"
+        }), 400
+
+    cursor.execute(
+        """
+        UPDATE projects
+        SET name = ?, description = ?
+        WHERE id = ?
+        """,
+        (
+            name.strip(),
+            description.strip(),
+            project_id
+        )
+    )
+
+    conn.commit()
+
+    updated = cursor.rowcount
+
+    conn.close()
+
+    if updated == 0:
+        return jsonify({
+            "error": "Project not found"
+        }), 404
+
+    return jsonify({
+        "message": "Project updated successfully!"
+    })
+
+
+# ==================== COMPANIES ====================
+
+@app.route("/api/companies", methods=["GET"])
+def get_companies():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM companies ORDER BY id DESC")
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return jsonify([
+        {
+            "id": row[0],
+            "name": row[1],
+            "status": row[2] or "Not Applied"
+        }
+        for row in rows
+    ])
+
+
+@app.route("/api/companies", methods=["POST"])
+def add_company():
+
+    data = read_json()
+
+    name = data.get("name", "")
+    status = data.get("status", "Not Applied")
+
+    if not isinstance(name, str) or not name.strip():
+        return jsonify({
+            "error": "Company name is required"
+        }), 400
+
+    allowed_statuses = [
+        "Not Applied",
+        "Applied",
+        "Interview",
+        "Selected"
+    ]
+
+    if status not in allowed_statuses:
+        return jsonify({
+            "error": "Invalid application status"
+        }), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO companies (name, status)
+        VALUES (?, ?)
+        """,
+        (
+            name.strip(),
+            status
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "message": "Company added successfully!"
+    }), 201
+
+
+@app.route("/api/companies/<int:company_id>", methods=["PUT", "DELETE"])
+def update_company(company_id):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # DELETE COMPANY
+    if request.method == "DELETE":
+
+        cursor.execute(
+            "DELETE FROM companies WHERE id = ?",
+            (company_id,)
+        )
+
+        conn.commit()
+
+        deleted = cursor.rowcount
+
+        conn.close()
+
+        if deleted == 0:
+            return jsonify({
+                "error": "Company not found"
+            }), 404
+
+        return jsonify({
+            "message": "Company deleted successfully!"
+        })
+
+    # UPDATE COMPANY
+    data = read_json()
+
+    status = data.get("status", "")
+
+    allowed_statuses = [
+        "Not Applied",
+        "Applied",
+        "Interview",
+        "Selected"
+    ]
+
+    if status not in allowed_statuses:
+
+        conn.close()
+
+        return jsonify({
+            "error": "Invalid application status"
+        }), 400
+
+    cursor.execute(
+        """
+        UPDATE companies
+        SET status = ?
+        WHERE id = ?
+        """,
+        (
+            status,
+            company_id
+        )
+    )
+
+    conn.commit()
+
+    updated = cursor.rowcount
+
+    conn.close()
+
+    if updated == 0:
+        return jsonify({
+            "error": "Company not found"
+        }), 404
+
+    return jsonify({
+        "message": "Company status updated successfully!"
+    })
+
+
+# ==================== DSA ====================
+
+@app.route("/api/dsa", methods=["GET"])
+def get_dsa():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM dsa ORDER BY id DESC")
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return jsonify([
+        {
+            "id": row[0],
+            "topic": row[1],
+            "total_problems": row[2],
+            "solved_problems": row[3]
+        }
+        for row in rows
+    ])
+
+
+@app.route("/api/dsa", methods=["POST"])
+def add_dsa():
+
+    data = read_json()
+
+    topic = data.get("topic", "")
+
+    if not isinstance(topic, str) or not topic.strip():
+        return jsonify({
+            "error": "Topic name is required"
+        }), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO dsa
+        (topic, total_problems, solved_problems)
+        VALUES (?, 0, 0)
+        """,
+        (topic.strip(),)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "message": "DSA topic added successfully!"
+    }), 201
+
+
+@app.route("/api/dsa/<int:topic_id>", methods=["PUT", "DELETE"])
+def update_dsa(topic_id):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # DELETE DSA TOPIC
+    if request.method == "DELETE":
+
+        cursor.execute(
+            "DELETE FROM dsa WHERE id = ?",
+            (topic_id,)
+        )
+
+        conn.commit()
+
+        deleted = cursor.rowcount
+
+        conn.close()
+
+        if deleted == 0:
+            return jsonify({
+                "error": "DSA topic not found"
+            }), 404
+
+        return jsonify({
+            "message": "DSA topic deleted successfully!"
+        })
+
+    # UPDATE DSA
+    data = read_json()
+
+    try:
+        total = int(data.get("total_problems"))
+        solved = int(data.get("solved_problems"))
+
+    except (TypeError, ValueError):
+
+        conn.close()
+
+        return jsonify({
+            "error": "Problem counts must be whole numbers"
+        }), 400
+
+    if total < 0 or solved < 0 or solved > total:
+
+        conn.close()
+
+        return jsonify({
+            "error": "Solved problems must be between 0 and total problems"
+        }), 400
+
+    cursor.execute(
+        """
+        UPDATE dsa
+        SET total_problems = ?, solved_problems = ?
+        WHERE id = ?
+        """,
+        (
+            total,
+            solved,
+            topic_id
+        )
+    )
+
+    conn.commit()
+
+    updated = cursor.rowcount
+
+    conn.close()
+
+    if updated == 0:
+        return jsonify({
+            "error": "DSA topic not found"
+        }), 404
+
+    return jsonify({
+        "message": "DSA progress updated successfully!"
+    })
+
+
+# ==================== INTERVIEWS ====================
+
+@app.route("/api/interviews", methods=["GET"])
+def get_interviews():
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM interviews ORDER BY id DESC")
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return jsonify([
+        {
+            "id": row[0],
+            "company": row[1],
+            "role": row[2] or "",
+            "interview_date": row[3] or "",
+            "status": row[4] or "Scheduled",
+            "notes": row[5] or ""
+        }
+        for row in rows
+    ])
+
+
+@app.route("/api/interviews", methods=["POST"])
+def add_interview():
+
+    data = read_json()
+
+    company = data.get("company", "")
+    role = data.get("role", "")
+    interview_date = data.get("interview_date", "")
+    status = data.get("status", "Scheduled")
+    notes = data.get("notes", "")
+
+    if not isinstance(company, str) or not company.strip():
+        return jsonify({
+            "error": "Company name is required"
+        }), 400
+
+    allowed_statuses = [
+        "Scheduled",
+        "Completed",
+        "Cancelled"
+    ]
+
+    if status not in allowed_statuses:
+        return jsonify({
+            "error": "Invalid interview status"
+        }), 400
+
+    if not all(
+        isinstance(value, str)
+        for value in [role, interview_date, notes]
+    ):
+        return jsonify({
+            "error": "Role, date, and notes must be text"
+        }), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO interviews
+        (company, role, interview_date, status, notes)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            company.strip(),
+            role.strip(),
+            interview_date.strip(),
+            status,
+            notes.strip()
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "message": "Interview added successfully!"
+    }), 201
+
+
+@app.route("/api/interviews/<int:interview_id>", methods=["PUT", "DELETE"])
+def update_interview(interview_id):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # DELETE INTERVIEW
+    if request.method == "DELETE":
+
+        cursor.execute(
+            "DELETE FROM interviews WHERE id = ?",
+            (interview_id,)
+        )
+
+        conn.commit()
+
+        deleted = cursor.rowcount
+
+        conn.close()
+
+        if deleted == 0:
+            return jsonify({
+                "error": "Interview not found"
+            }), 404
+
+        return jsonify({
+            "message": "Interview deleted successfully!"
+        })
+
+    # UPDATE INTERVIEW
+    data = read_json()
+
+    status = data.get("status", "")
+
+    allowed_statuses = [
+        "Scheduled",
+        "Completed",
+        "Cancelled"
+    ]
+
+    if status not in allowed_statuses:
+
+        conn.close()
+
+        return jsonify({
+            "error": "Invalid interview status"
+        }), 400
+
+    cursor.execute(
+        """
+        UPDATE interviews
+        SET status = ?
+        WHERE id = ?
+        """,
+        (
+            status,
+            interview_id
+        )
+    )
+
+    conn.commit()
+
+    updated = cursor.rowcount
+
+    conn.close()
+
+    if updated == 0:
+        return jsonify({
+            "error": "Interview not found"
+        }), 404
+
+    return jsonify({
+        "message": "Interview status updated successfully!"
+    })
+
+
+# ==================== START SERVER ====================
+
+init_db()
+
+
+if __name__ == "__main__":
+    app.run(
+        host="0.0.0.0",
+        port=5000,
+        debug=True
+    )
+
